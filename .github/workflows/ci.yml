@@ -90,4 +90,3 @@ jobs:
       
       - name: ✅ Docker validation successful
         run: echo "Docker compose file is valid!"
-        # Workflow actualizado - trigger execution
