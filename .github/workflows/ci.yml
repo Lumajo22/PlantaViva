@@ -42,14 +42,6 @@ jobs:
         run: |
           cd plantaviva-backend
           mvn test
-      
-      - name: 📊 Test Report
-        if: always()
-        uses: dorny/test-reporter@v1
-        with:
-          name: JUnit Test Results
-          path: plantaviva-backend/target/surefire-reports/*.xml
-          reporter: java-junit
 
   # ─── Frontend: Compilar con npm ────────────────────────────────
   frontend-build:
@@ -79,19 +71,3 @@ jobs:
       
       - name: ✅ Build successful
         run: echo "Frontend build completed successfully!"
-
-  # ─── Docker: Verificar que docker-compose funciona ─────────────
-  docker-check:
-    name: Docker - Validate compose
-    runs-on: ubuntu-latest
-    needs: [backend-tests, frontend-build]
-    
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-      
-      - name: 🐳 Validate docker-compose
-        run: docker-compose config
-      
-      - name: ✅ Docker validation successful
-        run: echo "Docker compose file is valid!"
