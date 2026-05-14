@@ -1,0 +1,49 @@
+# ════════════════════════════════════════════════════════════════════
+#   PlantaViva — .gitignore para el backend
+# ════════════════════════════════════════════════════════════════════
+
+# Maven
+target/
+*.jar
+*.war
+*.class
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+.classpath
+.project
+.settings/
+.factorypath
+
+# Eclipse
+.metadata/
+bin/
+tmp/
+.springBeans
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Variables de entorno
+.env
+.env.local
+application-local.properties
+
+# Maven Wrapper (opcional, comenta si quieres incluirlo)
+# .mvn/
+# mvnw
+# mvnw.cmd
+# Environment variables - NO SUBIR A GITHUB
+.env
+*.env
+application-oauth-local.properties

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # ─── Base de datos PostgreSQL ──────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: plantaviva-postgres
+    environment:
+      POSTGRES_DB: plantaviva
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - plantaviva-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend Spring Boot ───────────────────────────────────────────
+  backend:
+    build:
+      context: ./plantaviva-backend
+      dockerfile: Dockerfile
+    container_name: plantaviva-backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/plantaviva
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - plantaviva-network
+    restart: on-failure
+
+  # ─── Frontend React + Nginx ────────────────────────────────────────
+  frontend:
+    build:
+      context: ./plantaviva-frontend
+      dockerfile: Dockerfile
+    container_name: plantaviva-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - plantaviva-network
+    restart: on-failure
+
+# ─── Volúmenes ─────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+    driver: local
+
+# ─── Redes ─────────────────────────────────────────────────────────
+networks:
+  plantaviva-network:
+    driver: bridge

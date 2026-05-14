@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    ════════════════════════════════════════════════════════════════════
+      Proyecto:    PlantaViva — Control Inteligente de Cultivos
+      Módulo:      Backend
+      Stack:       Spring Boot 3.3.5  •  Java 21  •  PostgreSQL 15+
+      Autor:       Equipo PlantaViva
+      Versión:     1.0.0
+    ════════════════════════════════════════════════════════════════════
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Hereda de Spring Boot Parent (gestión de versiones automática) -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.3.5</version>
+        <relativePath/>
+    </parent>
+
+    <!-- Identificación del artefacto -->
+    <groupId>com.plantaviva</groupId>
+    <artifactId>plantaviva-backend</artifactId>
+    <version>1.0.0</version>
+    <name>plantaviva-backend</name>
+    <description>Backend Spring Boot del sistema PlantaViva</description>
+
+    <!-- Propiedades del proyecto -->
+    <properties>
+        <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <springdoc.version>2.5.0</springdoc.version>
+    </properties>
+
+    <dependencies>
+        <!-- ════════════════════════════════════════════════════════════
+             Web — Endpoints REST con @RestController
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Data JPA — Persistencia automática a PostgreSQL
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Driver JDBC de PostgreSQL -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Validación — anotaciones @NotNull, @Size, @Email, etc.
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Lombok — reduce código repetitivo (getters/setters/builder)
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             SpringDoc OpenAPI — Swagger UI automático en /swagger-ui.html
+             Cubre rúbrica punto 8 (documentación)
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             DevTools — recarga automática en desarrollo
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Spring Security — OAuth2 con Google
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+
+        <!-- ════════════════════════════════════════════════════════════
+             Test — JUnit 5 + Mockito (rúbrica punto 4)
+             ════════════════════════════════════════════════════════════ -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Plugin oficial de Spring Boot para empaquetar el JAR -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
