@@ -1,0 +1,45 @@
+{
+  "split": {
+    "train": "70%",
+    "validation": "15%",
+    "test": "15%"
+  },
+  "balancing": "SMOTE",
+  "features": [
+    "valor",
+    "umbral_min",
+    "umbral_max",
+    "rango",
+    "distancia_min",
+    "distancia_max",
+    "pct_rango",
+    "sensor_type_num"
+  ],
+  "models": [
+    {
+      "model": "RandomForest",
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "roc_auc": 1.0
+    },
+    {
+      "model": "SVM",
+      "accuracy": 0.9947,
+      "precision": 0.974,
+      "recall": 1.0,
+      "f1_score": 0.9868,
+      "roc_auc": 1.0
+    },
+    {
+      "model": "NeuralNetwork",
+      "accuracy": 0.9982,
+      "precision": 0.9912,
+      "recall": 1.0,
+      "f1_score": 0.9956,
+      "roc_auc": 0.9999
+    }
+  ],
+  "best_model": "RandomForest"
+}

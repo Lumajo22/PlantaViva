@@ -1,7 +1,8 @@
 /*
  * ════════════════════════════════════════════════════════════════════
  *   PlantaViva — LecturaService.java
- *   Función:  Lógica de negocio con detección de anomalías (IA)
+ *   Función: Lógica de negocio con detección de anomalías
+ *            Integra ML Flask API + umbral estadístico como fallback
  * ════════════════════════════════════════════════════════════════════
  */
 package com.plantaviva.service;
@@ -15,59 +16,55 @@ import com.plantaviva.repository.LecturaRepository;
 import com.plantaviva.repository.SensorRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
 
 /**
- * Servicio que gestiona las lecturas de sensores con detección
- * automática de anomalías mediante análisis estadístico (IA).
+ * Servicio que gestiona lecturas IoT con detección de anomalías.
  *
- * <p><strong>Algoritmo de detección de anomalías:</strong>
+ * <p><strong>Estrategia de detección:</strong>
  * <ol>
- *   <li>Compara el valor contra los umbrales del sensor</li>
- *   <li>Si está fuera de rango → marca {@code esAnomalia = true}</li>
- *   <li>Genera automáticamente una {@code Alerta} asociada</li>
+ *   <li>Consulta la Flask ML API (Random Forest + SVM + Neural Network)</li>
+ *   <li>Si Flask no está disponible, usa umbral estadístico como fallback</li>
  * </ol>
- *
- * <p>Este módulo cubre el requisito de <strong>IA aplicada</strong>
- * de la rúbrica del proyecto.
- *
- * @author  Equipo PlantaViva
- * @version 1.0.0
  */
 @Service
 @Transactional
 public class LecturaService {
 
-    private final LecturaRepository lecturaRepository;
-    private final SensorRepository sensorRepository;
-    private final AlertaRepository alertaRepository;
+    private final LecturaRepository  lecturaRepository;
+    private final SensorRepository   sensorRepository;
+    private final AlertaRepository   alertaRepository;
+    private final RestTemplate       restTemplate;
+
+    // Flask ML API URL
+    private static final String FLASK_URL = "http://localhost:5000/predict";
 
     public LecturaService(LecturaRepository lecturaRepository,
                           SensorRepository sensorRepository,
                           AlertaRepository alertaRepository) {
         this.lecturaRepository = lecturaRepository;
-        this.sensorRepository = sensorRepository;
-        this.alertaRepository = alertaRepository;
+        this.sensorRepository  = sensorRepository;
+        this.alertaRepository  = alertaRepository;
+        this.restTemplate      = new RestTemplate();
     }
 
-    /**
-     * Lista lecturas de un sensor paginadas.
-     */
+    // ─── LIST READINGS ──────────────────────────────────────────
     @Transactional(readOnly = true)
     public Page<LecturaDTO> listarPorSensor(Long sensorId, Pageable pageable) {
-        return lecturaRepository.findBySensorIdOrderByTimestampDesc(sensorId, pageable)
+        return lecturaRepository
+            .findBySensorIdOrderByTimestampDesc(sensorId, pageable)
             .map(this::toDTO);
     }
 
-    /**
-     * Obtiene una lectura por ID.
-     */
+    // ─── GET BY ID ──────────────────────────────────────────────
     @Transactional(readOnly = true)
     public LecturaDTO obtenerPorId(Long id) {
         Lectura lectura = lecturaRepository.findById(id)
@@ -76,45 +73,32 @@ public class LecturaService {
         return toDTO(lectura);
     }
 
-    /**
-     * Registra una nueva lectura con detección automática de anomalías.
-     *
-     * <p><strong>IA - Algoritmo de detección:</strong>
-     * <pre>
-     * SI (valor < umbralMin) O (valor > umbralMax) ENTONCES
-     *    esAnomalia = true
-     *    Crear Alerta automática
-     * SINO
-     *    esAnomalia = false
-     * FIN SI
-     * </pre>
-     *
-     * @param dto datos de la lectura
-     * @return lectura creada con flag de anomalía calculado
-     */
+    // ─── SAVE READING ───────────────────────────────────────────
     public LecturaDTO guardar(LecturaDTO dto) {
-        // 1. Validar que el sensor existe
+
+        // 1. Validate sensor
         Sensor sensor = sensorRepository.findById(dto.getSensorId())
             .orElseThrow(() -> new NoSuchElementException(
                 "Sensor no encontrado con ID: " + dto.getSensorId()));
 
-        // 2. Crear la lectura
+        // 2. Build reading
         Lectura lectura = Lectura.builder()
             .sensor(sensor)
             .valor(dto.getValor())
-            .timestamp(dto.getTimestamp() != null ? dto.getTimestamp() : LocalDateTime.now())
+            .timestamp(dto.getTimestamp() != null
+                ? dto.getTimestamp() : LocalDateTime.now())
             .build();
 
-        // ═══════════════════════════════════════════════════════════
-        // 🧠 DETECCIÓN DE ANOMALÍAS (IA)
-        // ═══════════════════════════════════════════════════════════
-        boolean esAnomalia = detectarAnomalia(dto.getValor(), sensor);
+        // ═══════════════════════════════════════════════════════
+        // 🧠 ANOMALY DETECTION — Flask ML API + Fallback
+        // ═══════════════════════════════════════════════════════
+        boolean esAnomalia = detectarAnomaliaML(dto.getValor(), sensor);
         lectura.setEsAnomalia(esAnomalia);
 
-        // 3. Guardar en la BD
+        // 3. Save
         Lectura guardada = lecturaRepository.save(lectura);
 
-        // 4. Si es anomalía → crear alerta automática
+        // 4. Auto-create alert if anomaly
         if (esAnomalia) {
             crearAlertaAutomatica(guardada, sensor);
         }
@@ -122,9 +106,7 @@ public class LecturaService {
         return toDTO(guardada);
     }
 
-    /**
-     * Elimina una lectura.
-     */
+    // ─── DELETE ─────────────────────────────────────────────────
     public void eliminar(Long id) {
         if (!lecturaRepository.existsById(id)) {
             throw new NoSuchElementException(
@@ -133,46 +115,63 @@ public class LecturaService {
         lecturaRepository.deleteById(id);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🧠 ALGORITMO DE IA - DETECCIÓN DE ANOMALÍAS
-    // ═══════════════════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════════════
+    // 🧠 ML ANOMALY DETECTION — calls Flask API
+    // ═══════════════════════════════════════════════════════════
 
     /**
-     * Detecta si un valor está fuera del rango aceptable.
-     *
-     * <p><strong>Lógica:</strong>
-     * <ul>
-     *   <li>Si el sensor tiene umbrales definidos, los usa</li>
-     *   <li>Si el valor está fuera → {@code true} (anomalía)</li>
-     *   <li>Si está dentro → {@code false} (normal)</li>
-     * </ul>
-     *
-     * @param valor  valor medido
-     * @param sensor sensor que hizo la medición
-     * @return {@code true} si es anomalía, {@code false} si es normal
+     * Primary: calls Flask ML API (3-model ensemble).
+     * Fallback: statistical threshold if Flask is unavailable.
      */
-    private boolean detectarAnomalia(Double valor, Sensor sensor) {
-        Double min = sensor.getUmbralMin();
-        Double max = sensor.getUmbralMax();
+    private boolean detectarAnomaliaML(Double valor, Sensor sensor) {
+        try {
+            // Build request body
+            Map<String, Object> body = new HashMap<>();
+            body.put("valor",       valor);
+            body.put("umbral_min",  sensor.getUmbralMin() != null
+                                    ? sensor.getUmbralMin() : 0.0);
+            body.put("umbral_max",  sensor.getUmbralMax() != null
+                                    ? sensor.getUmbralMax() : 100.0);
+            body.put("sensor_type", sensor.getTipo().name());
 
-        // Si no hay umbrales definidos, no se puede detectar anomalía
-        if (min == null && max == null) {
-            return false;
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+            // Call Flask API
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                FLASK_URL, request, Map.class);
+
+            if (response.getStatusCode() == HttpStatus.OK
+                    && response.getBody() != null) {
+                Object result = response.getBody().get("is_anomaly");
+                return Boolean.TRUE.equals(result);
+            }
+
+        } catch (Exception e) {
+            // Flask unavailable → use statistical fallback
+            System.out.println("⚠️  Flask ML API unavailable, using threshold fallback: "
+                + e.getMessage());
         }
 
-        // Verificar si está fuera de rango
-        boolean bajoDeMínimo = (min != null && valor < min);
-        boolean sobreMaximo = (max != null && valor > max);
-
-        return bajoDeMínimo || sobreMaximo;
+        // ── Fallback: statistical threshold ─────────────────────
+        return detectarAnomaliaFallback(valor, sensor);
     }
 
     /**
-     * Crea automáticamente una alerta cuando se detecta una anomalía.
-     *
-     * @param lectura lectura anómala
-     * @param sensor  sensor que generó la lectura
+     * Fallback: simple threshold comparison.
+     * Used when Flask ML API is not reachable.
      */
+    private boolean detectarAnomaliaFallback(Double valor, Sensor sensor) {
+        Double min = sensor.getUmbralMin();
+        Double max = sensor.getUmbralMax();
+        if (min == null && max == null) return false;
+        boolean bajoDeMínimo = (min != null && valor < min);
+        boolean sobreMaximo  = (max != null && valor > max);
+        return bajoDeMínimo || sobreMaximo;
+    }
+
+    // ─── AUTO ALERT ─────────────────────────────────────────────
     private void crearAlertaAutomatica(Lectura lectura, Sensor sensor) {
         String mensaje = String.format(
             "⚠️ Anomalía detectada en sensor %s (%s): " +
@@ -181,8 +180,10 @@ public class LecturaService {
             sensor.getPlanta().getNombre(),
             lectura.getValor(),
             sensor.getUnidad(),
-            sensor.getUmbralMin() != null ? sensor.getUmbralMin() : Double.NEGATIVE_INFINITY,
-            sensor.getUmbralMax() != null ? sensor.getUmbralMax() : Double.POSITIVE_INFINITY
+            sensor.getUmbralMin() != null
+                ? sensor.getUmbralMin() : Double.NEGATIVE_INFINITY,
+            sensor.getUmbralMax() != null
+                ? sensor.getUmbralMax() : Double.POSITIVE_INFINITY
         );
 
         Alerta alerta = Alerta.builder()
@@ -195,13 +196,13 @@ public class LecturaService {
         alertaRepository.save(alerta);
     }
 
-    // ─── MAPEO ENTRE ENTIDAD Y DTO ──────────────────────────────────
-
+    // ─── MAPPING ────────────────────────────────────────────────
     private LecturaDTO toDTO(Lectura l) {
         return LecturaDTO.builder()
             .id(l.getId())
             .sensorId(l.getSensor().getId())
-            .sensorNombre(l.getSensor().getPlanta().getNombre() + " - " + l.getSensor().getTipo())
+            .sensorNombre(l.getSensor().getPlanta().getNombre()
+                + " - " + l.getSensor().getTipo())
             .sensorTipo(l.getSensor().getTipo().name())
             .valor(l.getValor())
             .timestamp(l.getTimestamp())

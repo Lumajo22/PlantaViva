@@ -1,0 +1,23 @@
+# Virtual environment
+venv/
+
+# Trained models (too large for GitHub)
+models/*.pkl
+models/*.keras
+models/*.h5
+
+# Dataset generated files
+data/sensor_readings.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+
+# Jupyter
+.ipynb_checkpoints/
